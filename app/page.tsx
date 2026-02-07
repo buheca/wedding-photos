@@ -1,65 +1,151 @@
-import Image from "next/image";
 
-export default function Home() {
+// MISAFIR UPLOAD SAYFASI - QR kod taratınca burası açılır
+
+'use client'
+
+import { useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
+export default function UploadPage() {
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [message, setMessage] = useState('')
+
+  // Fotoğraf seçildiğinde çalışır
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0])
+      setMessage('') // Önceki mesajları temizle
+    }
+  }
+
+  // Upload butonuna basılınca çalışır
+  const handleUpload = async () => {
+    if (!file) {
+      setMessage('❌ Lütfen bir fotoğraf seçin')
+      return
+    }
+
+    setUploading(true)
+    setMessage('')
+
+    try {
+      // 1. Unique dosya adı oluştur (aynı isimli dosyalar çakışmasın)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `uploads/${fileName}`
+
+      // 2. Storage'a fotoğrafı yükle
+      const { error: uploadError } = await supabase.storage
+        .from('weeding-photos') // Bucket adı
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // 3. Database'e fotoğraf bilgisini kaydet
+      const { error: dbError } = await supabase
+        .from('photos')
+        .insert([
+          {
+            file_name: file.name,
+            file_path: filePath
+          }
+        ])
+
+      if (dbError) throw dbError
+
+      // Başarılı!
+      setMessage('✅ Fotoğrafınız yüklendi! Teşekkürler 💕')
+      setFile(null)
+      
+      // Input'u temizle
+      const fileInput = document.getElementById('file-input') as HTMLInputElement
+      if (fileInput) fileInput.value = ''
+
+    } catch (error) {
+      console.error('Upload error:', error)
+      setMessage('❌ Bir hata oluştu, lütfen tekrar deneyin')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+        
+        {/* Başlık */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            💒 Düğün Anıları
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-gray-600">
+            Fotoğraflarınızı bizimle paylaşın!
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Upload Form */}
+        <div className="space-y-4">
+          
+          {/* Dosya Seçici */}
+          <div>
+            <label 
+              htmlFor="file-input" 
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Fotoğraf Seçin
+            </label>
+            <input
+              id="file-input"
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-pink-50 file:text-pink-700
+                hover:file:bg-pink-100
+                cursor-pointer"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          {/* Seçilen dosya göster */}
+          {file && (
+            <div className="text-sm text-gray-600 bg-pink-50 p-3 rounded-lg">
+              📸 {file.name}
+            </div>
+          )}
+
+          {/* Upload Butonu */}
+          <button
+            onClick={handleUpload}
+            disabled={!file || uploading}
+            className="w-full bg-gradient-to-r from-pink-500 to-purple-500 
+              text-white font-semibold py-3 px-4 rounded-lg
+              hover:from-pink-600 hover:to-purple-600
+              disabled:opacity-50 disabled:cursor-not-allowed
+              transition-all duration-200 transform hover:scale-105"
           >
-            Documentation
-          </a>
+            {uploading ? '⏳ Yükleniyor...' : '💕 Fotoğrafı Yükle'}
+          </button>
+
+          {/* Mesaj Göster */}
+          {message && (
+            <div className={`text-center p-3 rounded-lg ${
+              message.includes('✅') 
+                ? 'bg-green-50 text-green-700' 
+                : 'bg-red-50 text-red-700'
+            }`}>
+              {message}
+            </div>
+          )}
         </div>
-      </main>
+
+        {/* Bilgilendirme */}
+        <p className="text-xs text-gray-500 text-center mt-6">
+          🔒 Fotoğraflarınız güvenle saklanır ve sadece çift tarafından görülebilir
+        </p>
+      </div>
     </div>
-  );
-}
+  )}
